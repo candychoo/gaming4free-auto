@@ -2,7 +2,7 @@ name: Gaming4free Auto Renew
 
 on:
   schedule:
-    - cron: '0 */2 * * *'  # 每 2 小时运行一次，可根据需要自行调整
+    - cron: '0 * * * *'  # 每 1 小时运行一次，可根据需要自行调整
   workflow_dispatch: # 允许手动触发
 
 jobs:
