@@ -2,16 +2,17 @@ name: Gaming4free Auto Renew
 
 on:
   schedule:
-    - cron: '0 * * * *'  # 每 1 小时运行一次，可根据需要自行调整
-  workflow_dispatch: # 允许手动触发
+    - cron: '0 * * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: write
 
 jobs:
   Renew-Gaming4free:
     runs-on: ubuntu-latest
-    permissions:
-      actions: write  
-      contents: read
-    
+
     steps:
     - uses: actions/checkout@v6
     - name: ⚙ 设置 Python
@@ -43,18 +44,23 @@ jobs:
       run: |
         xvfb-run --auto-servernum --server-args="-screen 0 1920x1080x24" \
           python3 gaming4free.py
-        
+
     - name: 🧹 清理旧的工作流运行记录
       if: always()
       env:
         GH_TOKEN: ${{ github.token }}
       run: |
-        runs=$(gh run list --workflow="${{ github.workflow }}" --limit=100 --json databaseId --jq '.[].databaseId')
-        count=0
-        for run_id in $runs; do
-          count=$((count + 1))
-          if [ $count -gt 5 ]; then  # 默认保留最新的 5 次记录，可自行修改为 1
-            echo "删除运行记录: $run_id"
-            gh run delete $run_id || true
+        RUNS=$(gh run list --repo "${{ github.repository }}" --workflow="Gaming4free Auto Renew" --limit=100 --json databaseId --jq '.[].databaseId')
+        COUNT=0
+        DELETED=0
+        for RUN_ID in $RUNS; do
+          COUNT=$((COUNT + 1))
+          if [ $COUNT -gt 1 ]; then
+            echo "删除运行记录: $RUN_ID"
+            if gh run delete --repo "${{ github.repository }}" "$RUN_ID"; then
+              DELETED=$((DELETED + 1))
+            fi
+            sleep 0.3
           fi
         done
+        echo "共找到 ${COUNT} 条，删除 ${DELETED} 条，保留最新 1 条"
