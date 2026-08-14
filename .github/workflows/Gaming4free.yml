@@ -49,18 +49,33 @@ jobs:
       if: always()
       env:
         GH_TOKEN: ${{ github.token }}
+        CURRENT_RUN_ID: ${{ github.run_id }}
       run: |
-        RUNS=$(gh run list --repo "${{ github.repository }}" --workflow="Gaming4free Auto Renew" --limit=100 --json databaseId --jq '.[].databaseId')
-        COUNT=0
+        PAGE=1
         DELETED=0
-        for RUN_ID in $RUNS; do
-          COUNT=$((COUNT + 1))
-          if [ $COUNT -gt 1 ]; then
-            echo "删除运行记录: $RUN_ID"
+        TOTAL=0
+        while true; do
+          RUNS=$(gh run list --repo "${{ github.repository }}" --workflow="Gaming4free Auto Renew" --limit=100 --page "$PAGE" --json databaseId --jq '.[].databaseId')
+          if [ -z "$RUNS" ]; then
+            break
+          fi
+          PAGE=$((PAGE + 1))
+          for RUN_ID in $RUNS; do
+            if [ "$RUN_ID" = "$CURRENT_RUN_ID" ]; then
+              echo "⏭️ 跳过当前运行 $RUN_ID"
+              continue
+            fi
+            TOTAL=$((TOTAL + 1))
+            echo "🗑️ 删除运行记录: $RUN_ID"
             if gh run delete --repo "${{ github.repository }}" "$RUN_ID"; then
               DELETED=$((DELETED + 1))
             fi
             sleep 0.3
+          done
+          # 如果拿到不满100条，说明没有更多了
+          COUNT=$(echo "$RUNS" | wc -w)
+          if [ "$COUNT" -lt 100 ]; then
+            break
           fi
         done
-        echo "共找到 ${COUNT} 条，删除 ${DELETED} 条，保留最新 1 条"
+        echo "📊 共找到 ${TOTAL} 条旧记录，删除 ${DELETED} 条，保留最新 1 条"
